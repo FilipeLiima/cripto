@@ -1,7 +1,32 @@
 import os
 import requests
 import json
-from googletrans import Translator
+
+def get_crypto_list():
+    url = "https://api.coingecko.com/api/v3/coins/markets"
+    params = {
+        'vs_currency': 'usd',
+        'order': 'market_cap_desc',
+        'per_page': 10,
+        'page': 1,
+        'sparkline': False,
+    }
+
+    try:
+        response = requests.get(url, params=params)
+
+        if response.status_code == 429:
+            print("Muitas requisições. Aguarde um momento e tente novamente.")
+            return []
+        elif response.status_code == 200:
+            crypto_list = response.json()
+            return [crypto['symbol'].upper() for crypto in crypto_list]
+        else:
+            print(f"Falha ao obter a lista de criptoativos. Status Code: {response.status_code}")
+            return []
+    except Exception as e:
+        print(f"Falha ao obter a lista de criptoativos: {e}")
+        return []
 
 
 def get_crypto_data(crypto_id):
@@ -16,7 +41,6 @@ def get_crypto_data(crypto_id):
             f"Falha ao obter dados para {crypto_id}. Status Code: {response.status_code}"
         )
         return None
-
 
 def get_general_info(crypto_id, language="en"):
     url_info = f"https://api.coingecko.com/api/v3/coins/{crypto_id}"
@@ -38,17 +62,7 @@ def get_general_info(crypto_id, language="en"):
     symbol = crypto_info.get("symbol", "Desconhecido")
 
     description_en = crypto_info.get("description", {}).get("en", "")
-    if description_en:
-        translator = Translator()
-        try:
-            translated_description = translator.translate(
-                description_en, dest="pt"
-            ).text
-        except Exception as e:
-            print(f"Falha ao traduzir a descrição: {e}")
-            translated_description = "Descrição não disponível."
-    else:
-        translated_description = "Descrição não disponível."
+    translated_description = description_en  # Manter a descrição original em inglês
 
     print(f"Informações Gerais sobre {name} ({symbol}):")
     print(f"Símbolo: {symbol}")
@@ -69,7 +83,6 @@ def get_general_info(crypto_id, language="en"):
 
     return crypto_data
 
-
 def save_to_json(data, file_path):
     data_folder = os.path.join(os.getcwd(), "data")
 
@@ -80,7 +93,6 @@ def save_to_json(data, file_path):
 
     with open(full_file_path, "w", encoding="utf-8") as json_file:
         json.dump(data, json_file, indent=2)
-
 
 if __name__ == "__main__":
     # Exemplo de uso para uma criptomoeda (substitua 'unknown' por outra criptomoeda se desejar)

@@ -32,7 +32,9 @@ def main():
     # Consultar ativos no banco de dados
     ativos = consultar_ativos_detalhes(conn)
 
-    opcao = st.sidebar.selectbox("Selecione o ativo", criptoativos_disponiveis, index=None, placeholder="Seleção...")
+    opcao = st.sidebar.selectbox("Selecione o ativo que deseja adicionar", criptoativos_disponiveis, index=None, placeholder="Seleção...")
+    opcao_excluir = st.sidebar.selectbox("Selecione o ativo que deseja excluir", [ativo[0] for ativo in ativos], index=None, placeholder="Seleção...")
+
     quantidade = st.sidebar.number_input("Quantidade comprada", min_value=0.01, step=0.01, format="%.2f")
     valor_pago = st.sidebar.number_input("Valor pago", min_value=0.01, step=0.01, format="%.2f")
     st.sidebar.write('Você selecionou:', opcao)
@@ -45,8 +47,7 @@ def main():
     # Botão para excluir ativo
     excluir_button = st.sidebar.button("Excluir Ativo", key="excluir_ativo_button")
 
-    # Opção para selecionar qual ativo excluir
-    opcao_excluir = st.sidebar.selectbox("Selecione o ativo para excluir", [ativo[0] for ativo in ativos])
+ 
 
     if excluir_button and opcao_excluir:
         if excluir_ativo(conn, opcao_excluir):

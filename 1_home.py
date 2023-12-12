@@ -1,62 +1,89 @@
 import streamlit as st
-from api_requests import get_general_info
-from googletrans import Translator
-from bs4 import BeautifulSoup
+from db import conectar_banco, consultar_ativos_detalhes, adicionar_ativo, excluir_ativo
+from datetime import datetime
+import pandas as pd
+import numpy as np
+
+# Função para obter a lista local de criptoativos
+def get_crypto_list_local():
+    return ["BTC", "ETH", "LTC", "XRP", "ADA", "DOT", "BCH", "LINK", "BNB", "XLM"]
+
+def format_decimal(decimal_value):
+    return float(decimal_value)
+
+def format_datetime(datetime_value):
+    return datetime_value.strftime("%Y-%m-%d %H:%M:%S") if datetime_value else None
+
+def main():
+    # Configurar a largura da página
+    st.set_page_config(layout="wide")
+
+    st.sidebar.title("Painel de Controle")
+    st.title("Carteira do investidor")
+
+    # Colunas ocupam 90% da tela
+    col1, col2 = st.columns([7, 3])
+    # Conectar ao banco de dados
+    conn = conectar_banco()
+
+    # Adicionando elementos à primeira coluna
+    criptoativos_disponiveis = get_crypto_list_local()
+
+    # Consultar ativos no banco de dados
+    ativos = consultar_ativos_detalhes(conn)
+
+    opcao = st.sidebar.selectbox("Selecione o ativo", criptoativos_disponiveis, index=None, placeholder="Seleção...")
+    quantidade = st.sidebar.number_input("Quantidade comprada", min_value=0.01, step=0.01, format="%.2f")
+    valor_pago = st.sidebar.number_input("Valor pago", min_value=0.01, step=0.01, format="%.2f")
+    st.sidebar.write('Você selecionou:', opcao)
+
+    # Botão para adicionar ativo ao banco de dados
+    if st.sidebar.button("Adicionar Ativo", key="adicionar_ativo_button"):
+        adicionar_ativo(conn, opcao, quantidade, valor_pago)
+        st.success(f"Ativo {opcao} adicionado com sucesso!")
+   
+    # Botão para excluir ativo
+    excluir_button = st.sidebar.button("Excluir Ativo", key="excluir_ativo_button")
+
+    # Opção para selecionar qual ativo excluir
+    opcao_excluir = st.sidebar.selectbox("Selecione o ativo para excluir", [ativo[0] for ativo in ativos])
+
+    if excluir_button and opcao_excluir:
+        if excluir_ativo(conn, opcao_excluir):
+            st.success(f"Ativo {opcao_excluir} excluído com sucesso!")
+        else:
+            st.warning(f"Ativo {opcao_excluir} não encontrado para exclusão.")
+    elif excluir_button:
+        st.warning("Nenhum ativo selecionado para exclusão.")
 
 
-def remove_html_tags(text):
-    soup = BeautifulSoup(text, "html.parser")
-    return soup.get_text()
 
+    # Criar uma lista para armazenar os dados formatados
+    formatted_data = []
 
-def translate_to_portuguese(text):
-    translator = Translator()
-    translation = translator.translate(text, dest="pt")
-    return translation.text
+    # Iterar sobre as transações e adicionar dados formatados à lista
+    for ativo in ativos:
+        formatted_data.append({
+            "Ativo": ativo[0],
+            "Usuário ID": ativo[1],
+            "Quantidade": format_decimal(ativo[2]),
+            "Valor Pago": format_decimal(ativo[3]),
+            "Data Transação": format_datetime(ativo[4]),
+        })
 
+    # Criar um DataFrame Pandas com os dados formatados
+    df = pd.DataFrame(formatted_data)
 
-def home():
-    st.write("## Informações gerais sobre criptoativos")
+    
+    # Exibir a tabela no Streamlit
+    col1.subheader("Lista de ativos na carteira")
+    col1.table(df)
 
-    # Menu 1: Home
-    st.subheader("")
+    col2.subheader("Evolução da carteira por operação")
+    col2.line_chart(df["Valor Pago"])
 
-    selected_crypto_home = st.sidebar.selectbox(
-        "Selecione um ativo:",
-        ["bitcoin", "ethereum", "outro-ativo"],
-        index=None,
-        key="home",
-        placeholder="Selecione um ativo...",
-    )
-
-    if selected_crypto_home:
-        # Garante que o valor não é None antes de chamar lower()
-        crypto_data_home = get_general_info(selected_crypto_home.lower())
-
-        if crypto_data_home:
-            # Exibe informações gerais sobre a moeda na direita da tela
-            st.write(
-                f"**Informações Gerais sobre {crypto_data_home.get('name', 'Desconhecido')}:**"
-            )
-            st.write(f"Símbolo: {crypto_data_home.get('symbol', 'Desconhecido')}")
-            st.write(f"Nome: {crypto_data_home.get('name', 'Desconhecido')}")
-
-            # Se a descrição em português estiver disponível, use-a; caso contrário, traduza a descrição em inglês
-            description_pt = crypto_data_home.get("descricao", {}).get("pt", None)
-            description_en = crypto_data_home.get("descricao", {}).get("en", None)
-
-            if description_pt:
-                cleaned_description = remove_html_tags(description_pt)
-            elif description_en:
-                cleaned_description = remove_html_tags(
-                    translate_to_portuguese(description_en)
-                )
-            else:
-                cleaned_description = "Descrição não disponível."
-
-            st.write(f"Descrição: {cleaned_description}")
-            # ... adicione outras informações que você deseja exibir
-
+    # Fechar conexão
+    conn.close()
 
 if __name__ == "__main__":
-    home()
+    main()

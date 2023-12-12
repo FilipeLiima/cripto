@@ -1,6 +1,8 @@
 import psycopg2
+import sqlite3
 from datetime import datetime
 import streamlit as st
+
 
 def conectar_banco():
     """
@@ -39,6 +41,38 @@ def adicionar_ativo(conn, nome, quantidade, valor_pago):
         print(f"Erro ao adicionar ativo: {e}")
         # Faça rollback para desfazer quaisquer alterações pendentes
         conn.rollback()
+
+
+def excluir_ativo(conn, nome_ativo):
+    try:
+        with conn.cursor() as cursor:
+            # Obter o ID do ativo pelo nome
+            cursor.execute("SELECT id FROM ativos WHERE nome = %s", (nome_ativo,))
+            ativo_id = cursor.fetchone()
+
+            if ativo_id:
+                ativo_id = ativo_id[0]
+
+                # Excluir transações associadas ao ativo
+                cursor.execute("DELETE FROM transacoes WHERE ativo_id = %s", (ativo_id,))
+
+                # Excluir o ativo
+                cursor.execute("DELETE FROM ativos WHERE id = %s", (ativo_id,))
+
+                # Commit para salvar as alterações no banco de dados
+                conn.commit()
+                return True
+            else:
+                return False
+    except Exception as e:
+        # Em caso de erro, imprima a mensagem de erro
+        print(f"Erro ao excluir ativo: {e}")
+        # Faça rollback para desfazer quaisquer alterações pendentes
+        conn.rollback()
+        return False
+
+
+    
 def consultar_ativos_detalhes(conn):
     # Função para consultar detalhes de ativos na carteira a partir do banco de dados
     cursor = conn.cursor()
